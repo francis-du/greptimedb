@@ -1,3 +1,4 @@
+use std::process::Output;
 // Copyright 2023 Greptime Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,7 +12,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 use sqlparser::ast::{ObjectName, SetExpr, Statement, UnaryOperator, Values};
 use sqlparser::parser::ParserError;
 
@@ -47,7 +47,8 @@ impl Insert {
         }
     }
 
-    pub fn values(&self) -> Result<Vec<Vec<Value>>> {
+    pub fn values(&self) -> Result<Output> {
+        println!("Insert => {:#?}",self.inner.clone());
         let values = match &self.inner {
             Statement::Insert { source, .. } => match &*source.body {
                 SetExpr::Values(Values { rows, .. }) => sql_exprs_to_values(rows)?,
@@ -101,7 +102,7 @@ impl TryFrom<Statement> for Insert {
 
     fn try_from(value: Statement) -> std::result::Result<Self, Self::Error> {
         match value {
-            Statement::Insert { .. } => Ok(Insert { inner: value }),
+            Statement::Insert { .. } => Ok(Insert { inner: value}),
             unexp => Err(ParserError::ParserError(format!(
                 "Not expected to be {unexp}"
             ))),
@@ -144,6 +145,21 @@ mod tests {
                 assert_eq!(values, vec![vec![Value::Number("1".to_string(), false)]]);
             }
             _ => unreachable!(),
+        }
+
+        // insert query
+        let sql = "INSERT INTO my_table select 1";
+        let stmt = ParserContext::create_with_dialect(sql, &GenericDialect {})
+            .unwrap()
+            .remove(0);
+        match stmt {
+            Statement::Insert(insert) => {
+                let values = insert.values().unwrap();
+                println!("Values: {:#?}", values);
+            }
+            _ => {
+                println!("Unsupported");
+            }
         }
     }
 }

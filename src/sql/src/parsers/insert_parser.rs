@@ -37,7 +37,7 @@ impl<'a> ParserContext<'a> {
                 sql: self.sql.to_string(),
                 keyword: unexp.to_string(),
             }
-            .fail(),
+                .fail(),
         }
     }
 }
@@ -45,7 +45,6 @@ impl<'a> ParserContext<'a> {
 #[cfg(test)]
 mod tests {
     use std::assert_matches::assert_matches;
-
     use sqlparser::dialect::GenericDialect;
 
     use super::*;
@@ -59,6 +58,34 @@ mod tests {
         let result = ParserContext::create_with_dialect(sql, &GenericDialect {}).unwrap();
         assert_eq!(1, result.len());
         assert_matches!(result[0], Statement::Insert { .. })
+    }
+
+
+    #[test]
+    pub fn test_parse_insert_from_query() {
+        let select = r"select * from table_1";
+        let select_result = ParserContext::create_with_dialect(select, &GenericDialect {}).unwrap();
+        assert_eq!(1, select_result.len());
+        let query1 = match select_result[0].clone() {
+            Statement::Query(query) => {
+                Some(Box::new(query.inner))
+            }
+            _ => None
+        };
+
+        let sql = format!("INSERT INTO table_1 {}", select);
+        let result = ParserContext::create_with_dialect(sql.as_str(), &GenericDialect {}).unwrap();
+        assert_eq!(1, result.len());
+        let query2 = match result[0].clone() {
+            Statement::Insert(insert) => {
+                match insert.inner {
+                    SpStatement::Insert { source, .. } => Some(source),
+                    _ => None
+                }
+            }
+            _ => None
+        };
+        assert_eq!(query1, query2);
     }
 
     #[test]
